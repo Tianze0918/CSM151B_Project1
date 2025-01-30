@@ -190,9 +190,15 @@ bool Core::check_data_hazards(const Instr &instr) {
     auto& ex_data = ex_mem_.data();
     // TODO: check LDAD instruction data hazards in EX/MEM
 
-    //if the preceding instruction in Mem is a load and destination register match our source register, we could stall or let it forward
-    //if the preceding instruction in EX is a load and its destination register match our source register, we must stall
-    
+    // if previous instruction is memory load and destination register match my current source register
+    //regfile_read uses instr.getRs1() to see if the register is 0. 
+    if ((instr.getRs1()!=0 && ex_data.instr->getRd()==instr.getRs1() && ex_data.instr->getExeFlags().is_load) || 
+        (instr.getRs2()!=0 && ex_data.instr->getRd()==instr.getRs2() && ex_data.instr->getExeFlags().is_load)){
+      fetch_stalled_ = true;
+      int hazard_reg=(ex_data.instr->getRd()==instr.getRs1())?1:2;
+      DT(3, "*** ID Stall: data hazard on rs" << hazard_reg << std::dec << " (#" << if_id_.data().uuid << ")");
+      return true;
+    }
   }
 
   return false;
@@ -201,16 +207,27 @@ bool Core::check_data_hazards(const Instr &instr) {
 bool Core::data_forwarding(uint32_t reg, uint32_t* data) {
   bool forwarded = false;
 
-  if (!ex_mem_.empty()) {
+  if (!ex_mem_.empty()) { 
     auto& ex_data = ex_mem_.data();
     auto& ex_instr = *ex_data.instr;
+    //Condition: if ex_mem rd equals current instruction's reg1 or reg2, and ex_mem is writing back to register file 
     // TODO: check data forwarding from EX/MEM
+    if (ex_instr.getExeFlags().use_rd && ex_instr.getRd()==reg){
+          *data=ex_data.result;
+          forwarded=true;
+          DT(3, "Forwarding: x" << reg << ", data=0x" << std::hex << ex_data.result << " from EX" << std::dec << " (#" << if_id_.data().uuid << ")");
+        }
   }
 
   if (!forwarded && !mem_wb_.empty()) {
     auto& mem_data = mem_wb_.data();
     auto& mem_instr = *mem_data.instr;
     // TODO: check data forwarding from MEM/WB
+    if (mem_instr.getExeFlags().use_rd && mem_instr.getRd()==reg){
+          *data=mem_data.result;
+          forwarded=true;
+          DT(3, "Forwarding: x" << reg << ", data=0x" << std::hex << mem_data.result << " from MEM" << std::dec << " (#" << if_id_.data().uuid << ")");
+      }
   }
 
   return forwarded;
@@ -222,6 +239,8 @@ void Core::regfile_read(const Instr &instr, uint32_t* rs1_data, uint32_t* rs2_da
   uint32_t _rs1_data(0), _rs2_data(0);
 
   if (exe_flags.use_rs1 && instr.getRs1() != 0) {
+    //if data forwarding doesn't happen, rs1 data is read directly from register file
+    //if data forwarding happens, rs1 data can be read from ex/mem register file or mem/wb register file
     if (!this->data_forwarding(instr.getRs1(), &_rs1_data)) {
       _rs1_data = reg_file_.at(instr.getRs1());
       DT(2, "Regfile: addr=" << instr.getRs1() << ", data=0x" << std::hex << _rs1_data << std::dec << " (#" << if_id_.data().uuid << ")");

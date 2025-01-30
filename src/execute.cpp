@@ -42,43 +42,43 @@ uint32_t Core::alu_unit(const Instr &instr, uint32_t rs1_data, uint32_t rs2_data
   case AluOp::NONE:
     break;
   case AluOp::ADD: {
-    rd_data = alu_s1+alu_s2 // TODO:
+    rd_data = alu_s1+alu_s2; // TODO:
     break;
   }
   case AluOp::SUB: {
-    rd_data = alu_s1-alu_s2// TODO:
+    rd_data = alu_s1-alu_s2;// TODO:
     break;
   }
   case AluOp::AND: {
-    rd_data = alu_s1 & alu_s2 // TODO:
+    rd_data = alu_s1 & alu_s2; // TODO:
     break;
   }
   case AluOp::OR: {
-    rd_data = alu_s1 | alu_s2// TODO:
+    rd_data = alu_s1 | alu_s2;// TODO:
     break;
   }
   case AluOp::XOR: {
-    rd_data = alu_s1 ^ alu_s2 // TODO:
+    rd_data = alu_s1 ^ alu_s2; // TODO:
     break;
   }
   case AluOp::SLL: {
-    rd_data = alu_s1 << alu_s2// TODO:
+    rd_data = alu_s1 << alu_s2;// TODO:
     break;
   }
   case AluOp::SRL: {
-    rd_data = (uint32_t)alu_s1 >> alu_s2// TODO:
+    rd_data = (uint32_t)alu_s1 >> alu_s2;// TODO:
     break;
   }
   case AluOp::SRA: {
-    rd_data = (int32_t)alu_s1 >> alu_s2/// TODO:
+    rd_data = (int32_t)alu_s1 >> alu_s2;/// TODO:
     break;
   }
   case AluOp::LTI: {
-    rd_data = (int32_t)rs1 < (int32_t)rs2 ? 1 : 0;// TODO:
+    rd_data = (int32_t)alu_s1 < (int32_t)alu_s2 ? 1 : 0;// TODO:
     break;
   }
   case AluOp::LTU: {
-    rd_data = (uint32_t)rs1 < (uint32_t)rs2 ? 1 : 0;// TODO:
+    rd_data = (uint32_t)alu_s1 < (uint32_t)alu_s2 ? 1 : 0;// TODO:
     break;
   }
   default:
@@ -111,11 +111,11 @@ uint32_t Core::branch_unit(const Instr &instr, uint32_t rs1_data, uint32_t rs2_d
     break;
   }
   case BrOp::BLT: {
-    br_taken = (rs1_data<rs2_data)?true:false;// TODO:
+    br_taken = ((int32_t)rs1_data<(int32_t)rs2_data)?true:false;// TODO:
     break;
   }
   case BrOp::BGE: {
-    br_taken =(rs1_data>=rs2_data)?true:false; // TODO:
+    br_taken =((int32_t)rs1_data>=(int32_t)rs2_data)?true:false; // TODO:
     break;
   }
   case BrOp::BLTU: {
@@ -137,7 +137,7 @@ uint32_t Core::branch_unit(const Instr &instr, uint32_t rs1_data, uint32_t rs2_d
       uint32_t next_PC = PC + 4;
       if (br_op == BrOp::JAL || br_op == BrOp::JALR) {  //If JAL instructions, the return address is current pc+4
       // we assume rd_data here to be return address
-        rd_data = next_PC// TODO:
+        rd_data = next_PC;// TODO:
       }
       // check misprediction
       //br_target=rd_data should store the target branching address after alu processing. Since result of alu operation is stored in rd.
@@ -173,7 +173,7 @@ uint32_t Core::mem_access(const Instr &instr, uint32_t rd_data, uint32_t rs2_dat
       rd_data = sext(read_data, data_width);
       break;
     case 2: // RV32I: LW
-      rd_data = read_data// TODO:
+      rd_data = read_data;// TODO:
       break;
     case 4: // RV32I: LBU
     case 5: // RV32I: LHU

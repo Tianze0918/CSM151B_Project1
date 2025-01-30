@@ -228,18 +228,18 @@ std::shared_ptr<Instr> Core::decode(uint32_t instr_code) const {  //shared_prt<I
     exe_flags.use_rs1 = 1;
     exe_flags.use_rs2 = 1;
     break;
-
   case InstType::I: {
     switch (opcode) {
-    case Opcode::I:
+    case Opcode::I:{
       exe_flags.use_rd  = 1;
       exe_flags.use_rs1 = 1;
       exe_flags.use_imm = 1;
       exe_flags.alu_s2_imm = 1;
       // imm = // TODO:
-      imm = (instr_code >> shift_rs2) & mask_i_imm;
-      imm = (imm << (32-width_i_imm)) >> (32-width_i_imm); //left shift 20 then right shift 20
-      break;
+      int32_t tempI = (instr_code >> 20) & mask_i_imm; //20
+      tempI = (tempI << (32-12)) >> (32-12); //left shift 20 then right shift 20
+      imm=tempI;
+    }break;
     case Opcode::L:
     case Opcode::JALR: {
       exe_flags.use_rd  = 1;
@@ -247,8 +247,9 @@ std::shared_ptr<Instr> Core::decode(uint32_t instr_code) const {  //shared_prt<I
       exe_flags.use_imm = 1;
       exe_flags.alu_s2_imm = 1;
       // imm = // TODO: sign extension
-      imm = (instr_code >> shift_rs2) & mask_i_imm;
-      imm = (imm << (32-width_i_imm)) >> (32-width_i_imm); //left shift 20 then right shift 20
+      int32_t temp = (instr_code >> shift_rs2) & mask_i_imm;
+      temp = (temp << (32-width_i_imm)) >> (32-width_i_imm); //left shift 20 then right shift 20
+      imm=temp;
     } break;
     case Opcode::SYS: {
       exe_flags.use_imm = 1;
@@ -275,10 +276,10 @@ std::shared_ptr<Instr> Core::decode(uint32_t instr_code) const {  //shared_prt<I
     exe_flags.use_imm = 1;
     exe_flags.alu_s2_imm = 1;
     // imm = // TODO:
-    int32_t top = (instr_code >> 7) & mask_reg;  //Extracts the top 5 bits
-    int32_t bottom = (instr_code >> 25) & mask_func7;  //Extracts the bottom 7 bits
-    imm = (top<<7) | bottom
-    imm = (imm << (32-12)) >> (32-12)
+    int32_t top = (instr_code >> 7) & mask_reg;  //Extracts the top 5 bits [4:0]
+    int32_t bottom = (instr_code >> 25) & mask_func7;  //Extracts the bottom 7 bits [11:5]
+    int32_t temp = top | (bottom<<5);
+    imm = (temp << 20) >> 20;
   } break;
 
   case InstType::B: {
@@ -292,9 +293,10 @@ std::shared_ptr<Instr> Core::decode(uint32_t instr_code) const {  //shared_prt<I
     int32_t imm4_1 = (instr_code >> 8) & 0xF;       // imm[4:1] (bits 11:8)
     int32_t imm11 = (instr_code >> 7) & 0x1;        // imm[11] (bit 7)
     // Combine fields into a single immediate
-    int32_t imm = (imm12 << 12) | (imm11 << 11) | (imm10_5 << 5) | (imm4_1 << 1);
+    int32_t temp = (imm12 << 12) | (imm11 << 11) | (imm10_5 << 5) | (imm4_1 << 1);
     // Sign-extend to 32 bits
-    imm = (imm << (32 - 13)) >> (32 - 13);
+    temp = (temp << (32 - 13)) >> (32 - 13);
+    imm= temp;
   } break;
 
   case InstType::U: {
@@ -303,7 +305,7 @@ std::shared_ptr<Instr> Core::decode(uint32_t instr_code) const {  //shared_prt<I
     exe_flags.alu_s2_imm = 1;
     // imm = // TODO:
     uint32_t extracted = instr_code & 0xFFFFF000;
-    imm = extracted
+    imm = extracted;
   } break;
 
   case InstType::J: {
@@ -317,10 +319,14 @@ std::shared_ptr<Instr> Core::decode(uint32_t instr_code) const {  //shared_prt<I
     int32_t imm19_12 = (instr_code >> 12) & 0xFF;   // imm[19:12] (bits 19:12)
 
     // Combine fields into a single immediate
-    int32_t imm = (imm20 << 20) | (imm19_12 << 12) | (imm11 << 11) | (imm10_1 << 1);
-
-    // Sign-extend to 32 bits
-    imm = (imm << (32 - 21)) >> (32 - 21);  // 21-bit immediate
+    int32_t imm_temp = (imm20 << 19) | (imm19_12 << 11) | (imm11 << 10) | imm10_1;
+//temp_file=$(mktemp)
+//./tinyrv -s tests/rv32ui-p-sub.hex > "$temp_file"
+//head -n 500 "$temp_file"
+//rm "$temp_file"
+    imm_temp = (imm_temp << 12) >> 12;  
+    imm_temp = imm_temp << 1; 
+    imm=imm_temp;
   } break;
 
   default:
@@ -335,47 +341,49 @@ std::shared_ptr<Instr> Core::decode(uint32_t instr_code) const {  //shared_prt<I
   switch (opcode) {
   case Opcode::LUI: {
     // RV32I: LUI
-    alu_op = AluOp::None // TODO:
+    alu_op = AluOp::ADD; // TODO:
     break;
   }
   case Opcode::AUIPC: {
     // RV32I: AUIPC
-    alu_op = AluOp::ADD// TODO:
+    alu_op = AluOp::ADD;// TODO:
     exe_flags.alu_s1_PC = 1;
     break;
   }
   case Opcode::R: {
     // alu_op = // TODO:
-    switch (funct3) {
-      case 0b000: alu_op = (funct7 == 0b0100000) ? AluOp::SUB : AluOp::ADD; break; // ADD/SUB
+    switch (func3) {
+      case 0b000: alu_op = (func7 == 0b0100000) ? AluOp::SUB : AluOp::ADD; break; // ADD/SUB
       case 0b100: alu_op = AluOp::XOR; break; // XOR
       case 0b110: alu_op = AluOp::OR; break; // OR
       case 0b111: alu_op = AluOp::AND; break; // AND
       case 0b001: alu_op = AluOp::SLL; break; // SLL
-      case 0b101: alu_op = (funct7 == 0b0100000) ? AluOp::SRA : AluOp::SRL; break; // SRL/SRA
-      case 0b010: alu_op = AluOp::LTI // LTI
-      case 0b011: alu_op = AluOp::LTU // LTU
+      case 0b101: alu_op = (func7 == 0b0100000) ? AluOp::SRA : AluOp::SRL; break; // SRL/SRA
+      case 0b010: alu_op = AluOp::LTI; break;// LTI
+      case 0b011: alu_op = AluOp::LTU; break;// LTU
     }
+    break;
   }
   case Opcode::I: {
     // alu_op = // TODO: 
-    switch (funct3) {
+    switch (func3) {
       case 0b000: alu_op = AluOp::ADD; break; // ADDI
       case 0b100: alu_op = AluOp::XOR; break; // XORI
       case 0b110: alu_op = AluOp::OR; break; // ORI
       case 0b111: alu_op = AluOp::AND; break; // ANDI
       case 0b001: alu_op = AluOp::SLL; break; // SLLI
-      case 0b101: alu_op = (funct7 == 0b0100000) ? AluOp::SRA : AluOp::SRL; break; // SRLI/SRAI
+      case 0b101: alu_op = (func7 == 0b0100000) ? AluOp::SRA : AluOp::SRL; break; // SRLI/SRAI
       case 0b010: alu_op = AluOp::LTI; break; // SLTI
       case 0b011: alu_op = AluOp::LTU; break; // SLTIU
     }
+    break;
   }
   case Opcode::B: {
     exe_flags.alu_s1_PC = 1;
     // alu_op = // TODO:
     // br_op = // TODO:
-    alu_op = AluOp::SUB; // Calculate branch target (PC + offset).
-    switch (funct3) {
+    alu_op = AluOp::ADD; // Calculate branch target (PC + offset).
+    switch (func3) {
       case 0b000: br_op = BrOp::BEQ; break; // BEQ
       case 0b001: br_op = BrOp::BNE; break; // BNE
       case 0b100: br_op = BrOp::BLT; break; // BLT
@@ -387,24 +395,24 @@ std::shared_ptr<Instr> Core::decode(uint32_t instr_code) const {  //shared_prt<I
   }
   case Opcode::JAL: {
     exe_flags.alu_s1_PC = 1;
-    alu_op = AluOp::ADD // TODO:
-    br_op = BrOp::JAL// TODO:
+    alu_op = AluOp::ADD; // TODO:
+    br_op = BrOp::JAL;// TODO:
     break;
   }
   case Opcode::JALR: {
-    alu_op = AluOp::ADD// TODO:
-    br_op = BrOp::JALR // TODO:
+    alu_op = AluOp::ADD;// TODO:
+    br_op = BrOp::JALR ;// TODO:
     break;
   }
   case Opcode::L: {
     // RV32I: LB, LH, LW, LBU, LHU
-    alu_op = AluOp::ADD// TODO:
+    alu_op = AluOp::ADD;// TODO:
     exe_flags.is_load = 1;
     break;
   }
   case Opcode::S: {
     // RV32I: SB, SH, SW
-    alu_op = AluOp::ADD// TODO:
+    alu_op = AluOp::ADD;// TODO:
     exe_flags.is_store = 1;
     break;
   }
